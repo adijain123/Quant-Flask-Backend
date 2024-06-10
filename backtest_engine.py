@@ -47,9 +47,6 @@ def run_backtest(strategy_name, symbol, period):
                 "maxDrawdown": round_stat(stats['Max. Drawdown [%]'])
             },
             "performanceSummary": {
-                "start": stats['Start'],
-                "end": stats['End'],
-                "duration": f"{(stats['End'] - stats['Start']).days} days",
                 "exposureTime": round_stat(stats['Exposure Time [%]']),
                 "equityFinal": round_stat(stats['Equity Final [$]']),
                 "equityPeak": round_stat(stats['Equity Peak [$]']),
@@ -62,15 +59,11 @@ def run_backtest(strategy_name, symbol, period):
                 "calmarRatio": round_stat(stats['Calmar Ratio']),
                 "maxDrawdown": round_stat(stats['Max. Drawdown [%]']),
                 "avgDrawdown": round_stat(stats['Avg. Drawdown [%]']),
-                "maxDrawdownDuration": f"{stats['Max. Drawdown Duration']} days",
-                "avgDrawdownDuration": f"{stats['Avg. Drawdown Duration']} days",
                 "trades": round_stat(stats['# Trades']),
                 "winRate": round_stat(stats['Win Rate [%]']),
                 "bestTrade": round_stat(stats['Best Trade [%]']),
                 "worstTrade": round_stat(stats['Worst Trade [%]']),
                 "avgTrade": round_stat(stats['Avg. Trade [%]']),
-                "maxTradeDuration": f"{stats['Max. Trade Duration']} days",
-                "avgTradeDuration": f"{stats['Avg. Trade Duration']} days",
                 "profitFactor": round_stat(stats['Profit Factor']),
                 "expectancy": round_stat(stats['Expectancy [%]']),
                 "sqn": round_stat(stats['SQN'])
@@ -81,7 +74,11 @@ def run_backtest(strategy_name, symbol, period):
                 "symbolInfo": symbol,
                 "start": stats['Start'],
                 "end": stats['End'],
-                "duration": f"{(stats['End'] - stats['Start']).days} days"
+                "duration": f"{(stats['End'] - stats['Start']).days} days",
+                 "maxTradeDuration": f"{stats['Max. Trade Duration']} days",
+                "avgTradeDuration": f"{stats['Avg. Trade Duration']} days",
+                "maxDrawdownDuration": f"{stats['Max. Drawdown Duration']} days",
+                "avgDrawdownDuration": f"{stats['Avg. Drawdown Duration']} days"
             }
         }
     except Exception as e:
