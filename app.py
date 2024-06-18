@@ -108,10 +108,13 @@ def backtest():
     request_data = request.json
     strategy = request_data["strategy"]
     symbol = request_data["symbol"]
-    period = request_data["period"]
+    cash = request_data["cash"]
+    timeframe = request_data["timeframe"]
+    datetimefrom = request_data["datetimefrom"]
+    datetimeto = request_data["datetimeto"]
     
     try:
-        result = run_backtest(strategy, symbol, period)
+        result = run_backtest(strategy, symbol, cash, timeframe, datetimefrom, datetimeto)
         return jsonify(result)
     except ValueError as e:
         logging.error(f"ValueError: {e}")
