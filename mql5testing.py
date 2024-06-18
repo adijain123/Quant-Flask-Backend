@@ -49,3 +49,5 @@ class SmaCross(Strategy):
 bt = Backtest(prices, SmaCross, commission=.002, cash=10000)
 stats = bt.run()
 print(stats)
+results_keys = bt._results.keys()
+print(results_keys)

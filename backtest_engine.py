@@ -2,14 +2,12 @@ import MetaTrader5 as mt
 from datetime import datetime
 import pandas as pd
 from backtesting import Backtest, Strategy
-from backtesting.lib import crossover
-from backtesting.test import SMA
-import strategies
 import logging
 import math
 import json
 import plotly.graph_objects as go
 import plotly.utils
+import strategies
 
 # Initialize MetaTrader 5
 mt.initialize()
@@ -86,9 +84,57 @@ def run_backtest(strategy_name, symbol, cash, timeframe, datetimefrom, datetimet
             name='OHLC'
         ))
 
+        # Extract trades data
+        trades = bt._results['_trades']
+
+        # Add markers for trade entries and exits on the OHLC plot
+        for trade in trades.itertuples():
+            if trade.EntryTime and trade.ExitTime:
+                fig.add_trace(go.Scatter(
+                    x=[trade.EntryTime],
+                    y=[prices.loc[trade.EntryTime, 'Open']],
+                    mode='markers',
+                    marker=dict(color='green', symbol='triangle-up', size=10),
+                    name='Trade Entry'
+                ))
+                fig.add_trace(go.Scatter(
+                    x=[trade.ExitTime],
+                    y=[prices.loc[trade.ExitTime, 'Close']],
+                    mode='markers',
+                    marker=dict(color='red', symbol='triangle-down', size=10),
+                    name='Trade Exit'
+                ))
+
+        # Plot the volume as a bar chart
+        # fig.add_trace(go.Bar(
+        #     x=prices.index,
+        #     y=prices['Volume'],
+        #     name='Volume'
+        # ))
+
+        # Calculate RSI (for example, 14-period RSI)
+        # delta = prices['Close'].diff()
+        # gain = delta.where(delta > 0, 0)
+        # loss = -delta.where(delta < 0, 0)
+        # avg_gain = gain.rolling(window=14).mean()
+        # avg_loss = loss.rolling(window=14).mean()
+        # rs = avg_gain / avg_loss
+        # rsi = 100 - (100 / (1 + rs))
+
+        # # Add the RSI to the plot
+        # fig.add_trace(go.Scatter(
+        #     x=rsi.index,
+        #     y=rsi,
+        #     mode='lines',
+        #     name='RSI'
+        # ))
+
+        # Create Equity Plotly figure manually
+        fig2 = go.Figure()
+
         # Add the equity curve to the plot
         equity_curve = bt._results['_equity_curve']
-        fig.add_trace(go.Scatter(
+        fig2.add_trace(go.Scatter(
             x=equity_curve.index,
             y=equity_curve['Equity'],
             mode='lines',
@@ -97,6 +143,7 @@ def run_backtest(strategy_name, symbol, cash, timeframe, datetimefrom, datetimet
 
         # Convert the figure to JSON
         plot_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+        plot_json2 = json.dumps(fig2, cls=plotly.utils.PlotlyJSONEncoder)
 
         return {
             "strategyName": strategy_name,
@@ -141,8 +188,9 @@ def run_backtest(strategy_name, symbol, cash, timeframe, datetimefrom, datetimet
                 "maxDrawdownDuration": f"{stats['Max. Drawdown Duration']} days",
                 "avgDrawdownDuration": f"{stats['Avg. Drawdown Duration']} days"
             },
-            "ohlc": prices.reset_index().to_dict(orient='records'),  # Return OHLC data
-            "plot": plot_json  # Return Plotly plot JSON data
+            # "ohlc": prices.reset_index().to_dict(orient='records'),  # Return OHLC data
+            "plot": plot_json,  # Return Plotly plot JSON data
+            "plotEquity": plot_json2  # Return Plotly plot JSON data
         }
     except Exception as e:
         logging.error("An error occurred during backtesting", exc_info=True)
