@@ -5,6 +5,8 @@ from flask_cors import CORS, cross_origin
 import finnhub
 from backtest_engine import run_backtest
 import logging
+from liveChart import live_Chart
+from companyInfo import company_Info
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -122,6 +124,26 @@ def backtest():
     except Exception as e:
         logging.error(f"Exception: {e}")
         return jsonify({"error": "An error occurred during backtesting"}), 500
-    
+
+@app.route("/liveChart", methods=["POST"]) 
+def liveChart():
+    symbol = request.json["symbol"]
+    try:
+        result = live_Chart(symbol)
+        return jsonify(result)
+    except ValueError as e:
+        logging.error(f"ValueError: {e}")
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/companyinfo", methods=["POST"]) 
+def companyInfo():
+    symbol = request.json["symbol1"]
+    try:
+        result = company_Info(symbol)
+        return jsonify(result)
+    except ValueError as e:
+        logging.error(f"ValueError: {e}")
+        return jsonify({"error": str(e)}), 400    
+
 if __name__ == "__main__":
     app.run(debug=True)
