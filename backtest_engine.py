@@ -1,7 +1,4 @@
-import MetaTrader5 as mt
 import yfinance as yf
-from datetime import datetime
-import pandas as pd
 from backtesting import Backtest, Strategy
 import logging
 import math
