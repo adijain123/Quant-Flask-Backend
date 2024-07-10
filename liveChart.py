@@ -1,23 +1,22 @@
-import MetaTrader5 as mt
-from datetime import datetime
-import pandas as pd
-
-# Initialize MetaTrader 5
-mt.initialize()
-
-# Login to MetaTrader 5
-login = 51825405
-password = '4Z&Bzq39lhA9G9'
-server = 'ICMarketsSC-Demo'
-mt.login(login, password, server)
+import yfinance as yf
 
 def live_Chart(symbol):
-    prices = pd.DataFrame(mt.copy_rates_range(symbol, mt.TIMEFRAME_D1, datetime(2024, 1, 1), datetime.now()))
-    prices['time'] = pd.to_datetime(prices['time'], unit='s')
-    prices.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'tick_volume': 'Volume'}, inplace=True)
-    prices = prices[['time', 'Open', 'High', 'Low', 'Close', 'Volume']]
-    prices.set_index('time', inplace=True)
+     # Fetch data from Yahoo Finance
+    data = yf.download(symbol, period="6mo")
 
-    return{
-        "ohlc": prices.reset_index().to_dict(orient='records')
-        }
+    # Reset index to get the date column
+    data.reset_index(inplace=True)
+
+    # Convert to the desired format
+    ohlc_data = []
+    for index, row in data.iterrows():
+        ohlc_data.append({
+            "Close": row['Close'],
+            "High": row['High'],
+            "Low": row['Low'],
+            "Open": row['Open'],
+            "Volume": row['Volume'],
+            "time": row['Date'].strftime("%a, %d %b %Y %H:%M:%S GMT")
+        })
+
+    return {"ohlc": ohlc_data}

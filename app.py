@@ -109,14 +109,12 @@ def fetch_stock_data():
 def backtest():
     request_data = request.json
     strategy = request_data["strategy"]
-    symbol = request_data["symbol"]
+    symbol = request_data["sym"]
     cash = request_data["cash"]
-    timeframe = request_data["timeframe"]
-    datetimefrom = request_data["datetimefrom"]
-    datetimeto = request_data["datetimeto"]
+    period = request_data["period"]
     
     try:
-        result = run_backtest(strategy, symbol, cash, timeframe, datetimefrom, datetimeto)
+        result = run_backtest(strategy, symbol, cash, period)
         return jsonify(result)
     except ValueError as e:
         logging.error(f"ValueError: {e}")
@@ -127,7 +125,7 @@ def backtest():
 
 @app.route("/liveChart", methods=["POST"]) 
 def liveChart():
-    symbol = request.json["symbol"]
+    symbol = request.json["symbol1"]
     try:
         result = live_Chart(symbol)
         return jsonify(result)
@@ -146,4 +144,4 @@ def companyInfo():
         return jsonify({"error": str(e)}), 400    
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)

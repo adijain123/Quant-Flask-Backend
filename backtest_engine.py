@@ -1,4 +1,5 @@
 import MetaTrader5 as mt
+import yfinance as yf
 from datetime import datetime
 import pandas as pd
 from backtesting import Backtest, Strategy
@@ -8,15 +9,6 @@ import json
 import plotly.graph_objects as go
 import plotly.utils
 import strategies
-
-# Initialize MetaTrader 5
-mt.initialize()
-
-# Login to MetaTrader 5
-login = 51825405
-password = '4Z&Bzq39lhA9G9'
-server = 'ICMarketsSC-Demo'
-mt.login(login, password, server)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -31,38 +23,17 @@ def round_stat(value):
     else:
         return value
 
-def run_backtest(strategy_name, symbol, cash, timeframe, datetimefrom, datetimeto):
+def run_backtest(strategy_name, symbol, cash, period):
     try:
-        if timeframe == "1 minutes":
-            timeframe = mt.TIMEFRAME_M1
-        elif timeframe == "5 minutes":
-            timeframe = mt.TIMEFRAME_M5
-        elif timeframe == "15 minutes":
-            timeframe = mt.TIMEFRAME_M15
-        elif timeframe == "30 minutes":
-            timeframe = mt.TIMEFRAME_M30
-        elif timeframe == "1 hour":
-            timeframe = mt.TIMEFRAME_H1
-        elif timeframe == "1 day":
-            timeframe = mt.TIMEFRAME_D1
-        elif timeframe == "1 week":
-            timeframe = mt.TIMEFRAME_W1
-        elif timeframe == "1 month":
-            timeframe = mt.TIMEFRAME_MN1
+        # Fetch historical data using yfinance
+        ticker = yf.Ticker(symbol)
+        prices = ticker.history(period=period)
 
-        start_date = datetime.fromtimestamp(datetimefrom)
-        end_date = datetime.fromtimestamp(datetimeto)
+        logging.debug(f"Data fetched for {symbol} over period {period}: {prices.head()}")
 
-        prices = pd.DataFrame(mt.copy_rates_range(symbol, timeframe, datetime(start_date.year, start_date.month, start_date.day), datetime(end_date.year, end_date.month, end_date.day)))
-
-        prices['time'] = pd.to_datetime(prices['time'], unit='s')
-        prices.rename(columns={'open': 'Open', 'high': 'High', 'low': 'Low', 'close': 'Close', 'tick_volume': 'Volume'}, inplace=True)
-        prices = prices[['time', 'Open', 'High', 'Low', 'Close', 'Volume']]
-        prices.set_index('time', inplace=True)
-
-        logging.debug(f"Data fetched for {symbol} over timeframe {timeframe}: {prices.head()}")
-
+        # Get the strategy class from the strategies module
         strategy_class = getattr(strategies, strategy_name, None)
+        
         if strategy_class is None:
             raise ValueError(f"Strategy {strategy_name} not found in strategies module")
 
