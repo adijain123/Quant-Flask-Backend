@@ -126,6 +126,7 @@ def backtest():
 @app.route("/liveChart", methods=["POST"]) 
 def liveChart():
     symbol = request.json["symbol1"]
+    print(symbol)
     try:
         result = live_Chart(symbol)
         return jsonify(result)

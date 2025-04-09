@@ -1,15 +1,23 @@
 import yfinance as yf
+import pandas as pd
 
 def live_Chart(symbol):
-     # Fetch data from Yahoo Finance
+    # Fetch data from Yahoo Finance
     data = yf.download(symbol, period="6mo")
 
-    # Reset index to get the date column
+    # Flatten MultiIndex columns (Price/Ticker)
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
+
+    # Reset index to get 'Date' as a column
     data.reset_index(inplace=True)
 
-    # Convert to the desired format
+    # Make sure 'Date' is datetime
+    data['Date'] = pd.to_datetime(data['Date'])
+
+    # Format the data
     ohlc_data = []
-    for index, row in data.iterrows():
+    for _, row in data.iterrows():
         ohlc_data.append({
             "Close": row['Close'],
             "High": row['High'],
