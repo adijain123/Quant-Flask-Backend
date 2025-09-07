@@ -22,6 +22,9 @@ bcrypt = Bcrypt(app)
 CORS(app, supports_credentials=True)
 db.init_app(app)
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
+
 # Create database tables
 with app.app_context():
     db.create_all()
@@ -33,17 +36,20 @@ def hello_world():
 
 @app.route("/signup", methods=["POST"])
 def signup():
-    firstname = request.json["firstname"]
-    lastname = request.json["lastname"]
-    email = request.json["email"]
-    password = request.json["password"]
+    data = request.get_json()
+    firstname = data.get("firstname")
+    lastname = data.get("lastname")
+    email = data.get("email")
+    password = data.get("password")
+
+    if not all([firstname, lastname, email, password]):
+        return jsonify({"error": "Missing signup fields"}), 400
 
     user_exists = User.query.filter_by(email=email).first() is not None
-
     if user_exists:
         return jsonify({"error": "Email already exists"}), 409
     
-    hashed_password = bcrypt.generate_password_hash(password)
+    hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
     new_user = User(firstname=firstname, lastname=lastname, email=email, password=hashed_password)
     db.session.add(new_user)
     db.session.commit()
@@ -59,15 +65,15 @@ def signup():
 
 @app.route("/login", methods=["POST"])
 def login_user():
-    email = request.json["email"]
-    password = request.json["password"]
+    data = request.get_json()
+    email = data.get("email")
+    password = data.get("password")
+
+    if not email or not password:
+        return jsonify({"error": "Missing email or password"}), 400
 
     user = User.query.filter_by(email=email).first()
-
-    if user is None:
-        return jsonify({"error": "Unauthorized Access"}), 401
-    
-    if not bcrypt.check_password_hash(user.password, password):
+    if user is None or not bcrypt.check_password_hash(user.password, password):
         return jsonify({"error": "Unauthorized"}), 401
 
     session["user_id"] = user.id
@@ -88,31 +94,36 @@ symbols = ["AAPL", "GOOGL", "AMZN", "MSFT", "TSLA", "META", "NFLX", "NVDA", "WMT
 @app.route('/stockdata', methods=['POST'])
 def fetch_stock_data():
     stock_data = []
-
     for symbol in symbols:
-        data = finnhub_client.quote(symbol)
-        change = data['dp']
-        if data['pc'] > data['c']:
-            change = -abs(change)
-        
-        stock_info = {
-            "symbol": symbol,
-            "value": data['c'],
-            "change": change
-        }
-        stock_data.append(stock_info)
+        try:
+            data = finnhub_client.quote(symbol)
+            change = data['dp']
+            if data['pc'] > data['c']:
+                change = -abs(change)
+
+            stock_info = {
+                "symbol": symbol,
+                "value": data['c'],
+                "change": change
+            }
+            stock_data.append(stock_info)
+        except Exception as e:
+            logging.error(f"Error fetching stock data for {symbol}: {e}")
 
     return jsonify(stock_data)
 
 @app.route("/api/backtest", methods=["POST"])
 @cross_origin()
 def backtest():
-    request_data = request.json
-    strategy = request_data["strategy"]
-    symbol = request_data["sym"]
-    cash = request_data["cash"]
-    period = request_data["period"]
+    data = request.get_json()
+    strategy = data.get("strategy")
+    symbol = data.get("sym")
+    cash = data.get("cash")
+    period = data.get("period")
     
+    if not all([strategy, symbol, cash, period]):
+        return jsonify({"error": "Missing backtest parameters"}), 400
+
     try:
         result = run_backtest(strategy, symbol, cash, period)
         return jsonify(result)
@@ -125,7 +136,11 @@ def backtest():
 
 @app.route("/liveChart", methods=["POST"]) 
 def liveChart():
-    symbol = request.json["symbol1"]
+    data = request.get_json()
+    symbol = data.get("symbol1")
+    if not symbol:
+        return jsonify({"error": "Missing 'symbol1' in request body"}), 400
+
     try:
         result = live_Chart(symbol)
         return jsonify(result)
@@ -135,13 +150,20 @@ def liveChart():
 
 @app.route("/companyinfo", methods=["POST"]) 
 def companyInfo():
-    symbol = request.json["symbol1"]
+    data = request.get_json()
+    symbol = data.get("symbol")
+    if not symbol:
+        return jsonify({"error": "Missing 'symbol' in request body"}), 400
+
     try:
         result = company_Info(symbol)
         return jsonify(result)
     except ValueError as e:
         logging.error(f"ValueError: {e}")
-        return jsonify({"error": str(e)}), 400    
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logging.error(f"Exception: {e}")
+        return jsonify({"error": "Failed to fetch company info"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
