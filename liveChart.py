@@ -2,29 +2,35 @@ import yfinance as yf
 import pandas as pd
 
 def live_Chart(symbol):
-    # Fetch data from Yahoo Finance
-    data = yf.download(symbol, period="6mo")
+    try:
+        # Fetch data directly — let yfinance handle the session internally
+        data = yf.download(symbol, period="6mo", progress=False)
 
-    # Flatten MultiIndex columns (Price/Ticker)
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
+        if data.empty:
+            return {"error": f"No data found for symbol: {symbol}"}
 
-    # Reset index to get 'Date' as a column
-    data.reset_index(inplace=True)
+        # Flatten MultiIndex columns (if present)
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
 
-    # Make sure 'Date' is datetime
-    data['Date'] = pd.to_datetime(data['Date'])
+        # Reset index to get 'Date' as a column
+        data.reset_index(inplace=True)
+        data['Date'] = pd.to_datetime(data['Date'])
 
-    # Format the data
-    ohlc_data = []
-    for _, row in data.iterrows():
-        ohlc_data.append({
-            "Close": row['Close'],
-            "High": row['High'],
-            "Low": row['Low'],
-            "Open": row['Open'],
-            "Volume": row['Volume'],
-            "time": row['Date'].strftime("%a, %d %b %Y %H:%M:%S GMT")
-        })
+        # Format OHLC data
+        ohlc_data = [
+            {
+                "Close": row['Close'],
+                "High": row['High'],
+                "Low": row['Low'],
+                "Open": row['Open'],
+                "Volume": row['Volume'],
+                "time": row['Date'].strftime("%a, %d %b %Y %H:%M:%S GMT")
+            }
+            for _, row in data.iterrows()
+        ]
 
-    return {"ohlc": ohlc_data}
+        return {"ohlc": ohlc_data}
+
+    except Exception as e:
+        return {"error": str(e)}
