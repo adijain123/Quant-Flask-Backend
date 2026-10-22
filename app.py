@@ -1,115 +1,45 @@
-```python
-import os
-import logging
-
+# pyrefly: ignore[missing-import]
 from flask import Flask, request, jsonify, session
-from flask_bcrypt import Bcrypt
-from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
-
 from models import db, User
+# pyrefly: ignore[missing-import]
+from flask_bcrypt import Bcrypt
+from flask_cors import CORS, cross_origin
+# pyrefly: ignore[missing-import]
 import finnhub
 from backtest_engine import run_backtest
+import logging
 from liveChart import live_Chart
 from companyInfo import company_Info
 
-
-# --------------------------------------------------
-# Flask application configuration
-# --------------------------------------------------
-
+# Initialize Flask app
 app = Flask(__name__)
 
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY")
+# Configuration
+app.config['SECRET_KEY'] = 'cairocoders-ednalan'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///flaskdb.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ECHO'] = True
 
-if not app.config["SECRET_KEY"]:
-    raise RuntimeError("SECRET_KEY environment variable is not configured.")
-
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL",
-    "sqlite:///flaskdb.db"
-)
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ECHO"] = False
-
-# Session cookie configuration for cross-origin requests.
-# Use HTTPS in production.
-app.config["SESSION_COOKIE_SECURE"] = True
-app.config["SESSION_COOKIE_HTTPONLY"] = True
-app.config["SESSION_COOKIE_SAMESITE"] = "None"
-
-# --------------------------------------------------
-# Extensions
-# --------------------------------------------------
-
+# Initialize extensions
 bcrypt = Bcrypt(app)
-
-CORS(
-    app,
-    resources={
-        r"/*": {
-            "origins": [
-                "https://algo-trading-sigma.vercel.app"
-            ]
-        }
-    },
-    supports_credentials=True,
-    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"]
-)
-
+CORS(app, supports_credentials=True)
 db.init_app(app)
 
-# --------------------------------------------------
-# Logging
-# --------------------------------------------------
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s] %(message)s")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
-)
-
-# --------------------------------------------------
-# Database initialization
-# --------------------------------------------------
-
+# Create database tables
 with app.app_context():
     db.create_all()
 
-# --------------------------------------------------
-# Finnhub configuration
-# --------------------------------------------------
-
-FINNHUB_API_KEY = os.environ.get("FINNHUB_API_KEY")
-
-if not FINNHUB_API_KEY:
-    logging.warning(
-        "FINNHUB_API_KEY is not configured. Stock-data requests will fail."
-    )
-    finnhub_client = None
-else:
-    finnhub_client = finnhub.Client(api_key=FINNHUB_API_KEY)
-
-symbols = [
-    "AAPL", "GOOGL", "AMZN", "MSFT", "TSLA",
-    "META", "NFLX", "NVDA", "WMT", "V"
-]
-
-# --------------------------------------------------
 # Routes
-# --------------------------------------------------
-
-@app.route("/", methods=["GET"])
+@app.route("/")
 def hello_world():
-    return jsonify({
-        "message": "Algorithmic Trading API is running"
-    })
-
+    return "<p>Hello, World!</p>"
 
 @app.route("/signup", methods=["POST"])
 def signup():
-    data = request.get_json(silent=True) or {}
-
+    data = request.get_json()
     firstname = data.get("firstname")
     lastname = data.get("lastname")
     email = data.get("email")
@@ -119,21 +49,11 @@ def signup():
         return jsonify({"error": "Missing signup fields"}), 400
 
     user_exists = User.query.filter_by(email=email).first() is not None
-
     if user_exists:
         return jsonify({"error": "Email already exists"}), 409
-
-    hashed_password = bcrypt.generate_password_hash(
-        password
-    ).decode("utf-8")
-
-    new_user = User(
-        firstname=firstname,
-        lastname=lastname,
-        email=email,
-        password=hashed_password
-    )
-
+    
+    hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+    new_user = User(firstname=firstname, lastname=lastname, email=email, password=hashed_password)
     db.session.add(new_user)
     db.session.commit()
 
@@ -143,14 +63,12 @@ def signup():
         "id": new_user.id,
         "firstname": new_user.firstname,
         "lastname": new_user.lastname,
-        "email": new_user.email
-    }), 201
-
+        "email": new_user.email,
+    })
 
 @app.route("/login", methods=["POST"])
 def login_user():
-    data = request.get_json(silent=True) or {}
-
+    data = request.get_json()
     email = data.get("email")
     password = data.get("password")
 
@@ -158,149 +76,97 @@ def login_user():
         return jsonify({"error": "Missing email or password"}), 400
 
     user = User.query.filter_by(email=email).first()
-
-    if user is None or not bcrypt.check_password_hash(
-        user.password, password
-    ):
+    if user is None or not bcrypt.check_password_hash(user.password, password):
         return jsonify({"error": "Unauthorized"}), 401
 
     session["user_id"] = user.id
-
+    
     return jsonify({
         "id": user.id,
         "firstname": user.firstname,
         "lastname": user.lastname,
-        "email": user.email
-    }), 200
+        "email": user.email,
+    })
 
+# Initialize Finnhub client
+finnhub_client = finnhub.Client(api_key="cpe4ie1r01qh24fmfqj0cpe4ie1r01qh24fmfqjg")
 
-@app.route("/stockdata", methods=["POST"])
+# List of symbols
+symbols = ["AAPL", "GOOGL", "AMZN", "MSFT", "TSLA", "META", "NFLX", "NVDA", "WMT", "V"]
+
+@app.route('/stockdata', methods=['POST'])
 def fetch_stock_data():
-    if finnhub_client is None:
-        return jsonify({
-            "error": "Stock data service is not configured"
-        }), 503
-
     stock_data = []
-
     for symbol in symbols:
         try:
             data = finnhub_client.quote(symbol)
-
-            current_price = data.get("c", 0)
-            previous_close = data.get("pc", 0)
-            change = data.get("dp", 0)
-
-            if previous_close > current_price:
+            change = data['dp']
+            if data['pc'] > data['c']:
                 change = -abs(change)
 
-            stock_data.append({
+            stock_info = {
                 "symbol": symbol,
-                "value": current_price,
+                "value": data['c'],
                 "change": change
-            })
+            }
+            stock_data.append(stock_info)
+        except Exception as e:
+            logging.error(f"Error fetching stock data for {symbol}: {e}")
 
-        except Exception:
-            logging.exception(
-                "Error fetching stock data for %s", symbol
-            )
-
-    if not stock_data:
-        return jsonify({
-            "error": "Unable to fetch stock data"
-        }), 502
-
-    return jsonify(stock_data), 200
-
+    return jsonify(stock_data)
 
 @app.route("/api/backtest", methods=["POST"])
+@cross_origin()
 def backtest():
-    data = request.get_json(silent=True) or {}
-
+    data = request.get_json()
     strategy = data.get("strategy")
     symbol = data.get("sym")
     cash = data.get("cash")
     period = data.get("period")
-
-    if any(value is None or value == "" for value in [
-        strategy, symbol, cash, period
-    ]):
-        return jsonify({
-            "error": "Missing backtest parameters"
-        }), 400
+    
+    if not all([strategy, symbol, cash, period]):
+        return jsonify({"error": "Missing backtest parameters"}), 400
 
     try:
         result = run_backtest(strategy, symbol, cash, period)
-        return jsonify(result), 200
-
+        return jsonify(result)
     except ValueError as e:
-        logging.warning("Backtest validation error: %s", e)
+        logging.error(f"ValueError: {e}")
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        logging.error(f"Exception: {e}")
+        return jsonify({"error": "An error occurred during backtesting"}), 500
 
-    except Exception:
-        logging.exception("Backtest failed")
-        return jsonify({
-            "error": "An error occurred during backtesting"
-        }), 500
-
-
-@app.route("/liveChart", methods=["POST"])
+@app.route("/liveChart", methods=["POST"]) 
 def liveChart():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json()
     symbol = data.get("symbol1")
-
     if not symbol:
-        return jsonify({
-            "error": "Missing 'symbol1' in request body"
-        }), 400
+        return jsonify({"error": "Missing 'symbol1' in request body"}), 400
 
     try:
         result = live_Chart(symbol)
-        return jsonify(result), 200
-
+        return jsonify(result)
     except ValueError as e:
-        logging.warning("Live chart validation error: %s", e)
+        logging.error(f"ValueError: {e}")
         return jsonify({"error": str(e)}), 400
 
-    except Exception:
-        logging.exception("Live chart request failed")
-        return jsonify({
-            "error": "Failed to fetch live chart data"
-        }), 500
-
-
-@app.route("/companyinfo", methods=["POST"])
+@app.route("/companyinfo", methods=["POST"]) 
 def companyInfo():
-    data = request.get_json(silent=True) or {}
+    data = request.get_json()
     symbol = data.get("symbol")
-
     if not symbol:
-        return jsonify({
-            "error": "Missing 'symbol' in request body"
-        }), 400
+        return jsonify({"error": "Missing 'symbol' in request body"}), 400
 
     try:
         result = company_Info(symbol)
-        return jsonify(result), 200
-
+        return jsonify(result)
     except ValueError as e:
-        logging.warning("Company info validation error: %s", e)
+        logging.error(f"ValueError: {e}")
         return jsonify({"error": str(e)}), 400
-
-    except Exception:
-        logging.exception("Company info request failed")
-        return jsonify({
-            "error": "Failed to fetch company info"
-        }), 500
-
-
-# --------------------------------------------------
-# Local development
-# --------------------------------------------------
+    except Exception as e:
+        logging.error(f"Exception: {e}")
+        return jsonify({"error": "Failed to fetch company info"}), 500
 
 if __name__ == "__main__":
-    app.run(
-        host="0.0.0.0",
-        port=int(os.environ.get("PORT", 5000)),
-        debug=False
-    )
+    app.run(debug=True)
